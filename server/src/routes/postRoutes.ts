@@ -7,7 +7,7 @@ import multer from 'multer';
 const storage = multer.memoryStorage();
 const postUpload = multer({
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 }
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB for video uploads
 }).single('file');
 
 const router = express.Router();

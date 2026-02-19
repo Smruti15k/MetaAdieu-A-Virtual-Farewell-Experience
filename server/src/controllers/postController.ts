@@ -14,9 +14,9 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
 
         // Start: File Upload Handling
         if (req.file) {
-            const { uploadToImgBB } = await import('../utils/imgbb');
-            // If it's a photo, upload to ImgBB
             if (req.file.mimetype.startsWith('image/')) {
+                // Upload images to ImgBB
+                const { uploadToImgBB } = await import('../utils/imgbb');
                 try {
                     content = await uploadToImgBB(req.file.buffer, req.file.originalname);
                 } catch (uploadError) {
@@ -25,8 +25,15 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
                     return;
                 }
             } else if (req.file.mimetype.startsWith('video/')) {
-                res.status(400).json({ error: 'Video upload requires external storage (S3/Cloudinary). ImgBB only supports images.' });
-                return;
+                // Upload videos to Cloudinary
+                const { uploadVideoToCloudinary } = await import('../utils/cloudinary');
+                try {
+                    content = await uploadVideoToCloudinary(req.file.buffer, req.file.originalname);
+                } catch (uploadError) {
+                    console.error("Cloudinary Upload Failed:", uploadError);
+                    res.status(500).json({ error: 'Failed to upload video' });
+                    return;
+                }
             }
         }
         // End: File Upload Handling
