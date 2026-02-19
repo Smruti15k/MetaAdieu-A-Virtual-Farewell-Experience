@@ -1,0 +1,138 @@
+.container {
+    padding: 1rem;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.addBtn {
+    background: #4A7FA7;
+    color: #0A1931;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.addBtn:hover {
+    transform: translateY(-2px);
+}
+
+.postForm {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.typeSelector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.typeBtn {
+    padding: 0.4rem 0.8rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.activeType {
+    background: #4A7FA7;
+    color: #0A1931;
+}
+
+.textArea,
+.captionInput {
+    width: 100%;
+    padding: 0.8rem;
+    background: rgba(10, 25, 49, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: white;
+    margin-bottom: 0.8rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    border-radius: 12px;
+    padding: 1rem;
+    break-inside: avoid;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.cardHeader {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-bottom: 0.5rem;
+}
+
+.author {
+    color: #4A7FA7;
+    font-weight: 600;
+}
+
+.cardContent img,
+.postVideo {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+}
+
+.postVideo {
+    max-height: 500px;
+    object-fit: cover;
+    background: #0A1931;
+}
+
+.textContent {
+    font-size: 1rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.caption {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #ddd;
+    font-style: italic;
+}
+
+.submitBtn {
+    width: 100%;
+    padding: 0.8rem;
+    background: linear-gradient(45deg, #0A1931, #1A3D63);
+    color: white;
+    border: 1px solid #4A7FA7;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.submitBtn:hover {
+    background: #4A7FA7;
+    color: #0A1931;
+}

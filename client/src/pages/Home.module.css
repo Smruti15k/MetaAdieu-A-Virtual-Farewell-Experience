@@ -1,0 +1,288 @@
+.container {
+    width: 100vw;
+    min-height: 100vh;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    position: relative;
+    padding-bottom: 5rem;
+}
+
+/* Aurora Background Effect */
+.container::before {
+    content: '';
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(circle at center, rgba(26, 61, 99, 0.4) 0%, rgba(10, 25, 49, 0) 70%);
+    filter: blur(80px);
+    z-index: 0;
+    animation: aurora 20s infinite alternate;
+}
+
+.container::after {
+    content: '';
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle at center, rgba(179, 207, 229, 0.3) 0%, rgba(10, 25, 49, 0) 70%);
+    filter: blur(100px);
+    z-index: 0;
+    animation: aurora 25s infinite alternate-reverse;
+}
+
+@keyframes aurora {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(20px, 20px);
+    }
+}
+
+.nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 5%;
+    position: relative;
+    z-index: 10;
+    background: rgba(10, 25, 49, 0.5);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.logo {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.navLinks {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.link {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+}
+
+.link:hover {
+    color: var(--text-primary);
+}
+
+.ctaBtn {
+    padding: 0.6rem 1.2rem;
+    background: var(--text-primary);
+    color: #0A1931;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ctaBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.3);
+}
+
+.hero {
+    position: relative;
+    z-index: 2;
+    padding: 6rem 5% 4rem;
+    text-align: center;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.heroContent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.pill {
+    padding: 0.4rem 1rem;
+    border-radius: 50px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 0.8rem;
+    color: var(--text-accent);
+    margin-bottom: 2rem;
+    backdrop-filter: blur(5px);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.title {
+    font-size: 5rem;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(180deg, #F6FAFD 0%, #B3CFE5 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 30px rgba(179, 207, 229, 0.1);
+}
+
+.subtitle {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    line-height: 1.6;
+    margin-bottom: 3rem;
+    font-weight: 300;
+}
+
+.heroButtons {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.btnPrimary {
+    padding: 1rem 2.5rem;
+    background: #fff;
+    color: #0A1931;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.btnPrimary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+}
+
+.btnSecondary {
+    padding: 1rem 2.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: #fff;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+}
+
+.btnSecondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Bento Grid Features */
+.features {
+    padding: 4rem 5%;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 300px);
+    gap: 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.featureCard {
+    background: var(--bg-card);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+    backdrop-filter: blur(10px);
+}
+
+.featureCard:hover {
+    background: var(--bg-card-hover);
+    transform: translateY(-5px);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 20px 40px rgba(10, 25, 49, 0.2);
+}
+
+/* Bento Grid Spans */
+.cardLarge {
+    grid-column: span 2;
+}
+
+.cardTall {
+    grid-row: span 2;
+}
+
+.featureIcon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+
+.featureCard h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.featureCard p {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* Background Gradients for Cards */
+.cardGradient1 {
+    background: linear-gradient(135deg, rgba(26, 61, 99, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+.cardGradient2 {
+    background: linear-gradient(135deg, rgba(179, 207, 229, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+.cardGradient3 {
+    background: linear-gradient(135deg, rgba(246, 250, 253, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%);
+}
+
+@media (max-width: 900px) {
+    .title {
+        font-size: 3.5rem;
+    }
+
+    .features {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+    }
+
+    .cardLarge,
+    .cardTall {
+        grid-column: span 1;
+        grid-row: span 1;
+    }
+
+    .featureCard {
+        min-height: 250px;
+    }
+}

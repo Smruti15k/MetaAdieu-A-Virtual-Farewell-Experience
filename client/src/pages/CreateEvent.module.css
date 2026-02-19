@@ -1,0 +1,215 @@
+.container {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+.contentWrapper {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+}
+
+/* Left Side: Form */
+.formSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* Start from top to avoid cutting off */
+    padding: 4rem 3rem;
+    /* More top padding */
+    position: relative;
+    z-index: 2;
+    background: rgba(10, 25, 49, 0.95);
+    /* Slightly more opaque */
+    /* Darker backdrop for contrast */
+    border-right: 1px solid var(--glass-border);
+    overflow-y: auto;
+    /* Allow scrolling if form is tall */
+    height: 100vh;
+}
+
+/* Custom Scrollbar for form section */
+.formSection::-webkit-scrollbar {
+    width: 6px;
+}
+
+.formSection::-webkit-scrollbar-track {
+    background: rgba(10, 25, 49, 0.1);
+}
+
+.formSection::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.backLink {
+    position: absolute;
+    /* Fix position to top left */
+    top: 1.5rem;
+    left: 2rem;
+    margin-bottom: 0;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.2s;
+    cursor: pointer;
+    font-weight: 500;
+    z-index: 10;
+}
+
+.backLink:hover {
+    color: var(--text-primary);
+}
+
+.formBox {
+    width: 100%;
+    max-width: 480px;
+    /* Constrain width for better readability */
+    margin: 2rem auto 0;
+    /* Add top margin to clear back link */
+    /* Center horizontally */
+}
+
+.formBox h2 {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-size: 3rem;
+    /* Slightly larger */
+    font-family: var(--font-serif);
+    text-align: left;
+    line-height: 1.1;
+}
+
+.subtitle {
+    margin-bottom: 2.5rem;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Right Side: Spline 3D */
+.splineSection {
+    flex: 1.5;
+    /* Give more space to 3D */
+    background: linear-gradient(135deg, #0A1931 0%, #1A3D63 100%);
+    position: relative;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.splineContainer {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* Form Styles */
+.formGroup {
+    margin-bottom: 1.5rem;
+}
+
+.formGroup label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.formGroup input,
+.formGroup textarea,
+.formGroup select {
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: var(--font-sans);
+    transition: all 0.3s ease;
+}
+
+.formGroup input:focus,
+.formGroup textarea:focus,
+.formGroup select:focus {
+    outline: none;
+    border-color: var(--accent-purple);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 4px rgba(26, 61, 99, 0.2);
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.5rem;
+}
+
+.submitBtn {
+    width: 100%;
+    padding: 1rem;
+    margin-top: 1.5rem;
+    border: none;
+    border-radius: 12px;
+    background: var(--text-primary);
+    color: #0A1931;
+    font-weight: 600;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.submitBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
+}
+
+.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    font-size: 0.9rem;
+}
+
+.backLink {
+    position: absolute;
+    top: 2rem;
+    left: 2rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.2s;
+}
+
+.backLink:hover {
+    color: var(--text-primary);
+}
+
+@media (max-width: 900px) {
+    .contentWrapper {
+        flex-direction: column-reverse;
+        height: auto;
+    }
+
+    .splineSection {
+        height: 40vh;
+        flex: none;
+    }
+
+    .formSection {
+        flex: none;
+        padding: 2rem 1.5rem;
+    }
+}
