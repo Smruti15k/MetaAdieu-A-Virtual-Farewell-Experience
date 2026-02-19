@@ -5,9 +5,9 @@ export const addEntry = async (req: Request, res: Response): Promise<void> => {
     try {
         const { eventId, message } = req.body;
         // @ts-ignore
-        const userId = req.user.id;
+        const userId = req.user?.id || 'anonymous';
         // @ts-ignore
-        const userName = req.user.name;
+        const userName = req.user?.name || 'Anonymous Guest';
 
         if (!eventId || !message) {
             res.status(400).json({ error: 'Message is required' });
