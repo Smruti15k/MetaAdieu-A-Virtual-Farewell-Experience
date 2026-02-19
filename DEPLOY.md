@@ -2,40 +2,45 @@
 # Deployment Guide
 
 This project is a monorepo containing a React Frontend (`client`) and an Express Backend (`server`).
-Because the backend uses **Socket.IO** for real-time features, it requires a persistent server and cannot be deployed as a standard Vercel Serverless Function.
+Because the backend uses **Socket.IO** for real-time features, it requires a persistent server.
 
-## Recommended Deployment Strategy
+## Option 1: Full Stack on Render (Recommended if you want everything in one place)
 
-### 1. Frontend (Vercel)
-Deploy the `client` directory to Vercel.
+You can deploy both the frontend and backend as separate services on Render.
 
-1.  Push this repository to GitHub.
-2.  Go to Vercel Dashboard -> Add New Project -> Import from GitHub.
-3.  Select the `client` directory as the **Root Directory** (cleaner distinct project).
-    *   *Click "Edit" next to Root Directory and select `client`.*
-4.  **Build Settings**: The default Vite settings should work automatically (`npm run build`, output `dist`).
-5.  **Environment Variables**:
-    *   Add `VITE_API_URL`: The URL of your deployed Backend (e.g., `https://your-app-server.onrender.com`).
-    *   Add `VITE_SOCKET_URL`: The URL of your deployed Backend (same as above).
-    *   Add your Firebase config variables (`VITE_FIREBASE_API_KEY`, etc.) from your `.env` file.
+### 1. Backend Service (Web Service)
+Deploy the `server` directory.
 
-### 2. Backend (Render / Railway)
-Deploy the `server` directory to a platform that supports persistent Node.js apps, like Render.com or Railway.app.
-
-#### Deploying on Render:
-1.  Create a new **Web Service**.
+1.  Create a new **Web Service** on Render.
 2.  Connect your GitHub repository.
 3.  **Root Directory**: Set to `server`.
-4.  **Runtime**: Docker (it will pick up the `server/Dockerfile` I created).
+4.  **Runtime**: Docker (it will pick up `server/Dockerfile`).
 5.  **Environment Variables**:
-    *   `PORT`: `5000` (internal port, Render will map it).
-    *   `GOOGLE_APPLICATION_CREDENTIALS`: Path to your service account key (requires uploading the file as a "Secret File" or setting the content as a variable if your code supports it).
-    *   Since we use `firebase-admin`, you need to provide the credentials.
-        *   **Option A**: Upload `serviceAccountKey.json` as a "Secret File" in Render with filename `../serviceAccountKey.json` (relative to where app runs) or adjust path.
-        *   **Option B**: Set `SERVICE_ACCOUNT_KEY_PATH` env var to `/etc/secrets/serviceAccountKey.json` (Render default path for secret files).
-    *   `CLIENT_URL`: The URL of your Vercel frontend (e.g., `https://your-app.vercel.app`) - for CORS.
+    *   `PORT`: `5000`
+    *   Upload your `serviceAccountKey.json` as a **Secret File** (Advanced -> Secret Files).
+        *   Filename: `serviceAccountKey.json`
+        *   Path: `../serviceAccountKey.json` (relative to app) or configure `SERVICE_ACCOUNT_KEY_PATH` to `/etc/secrets/serviceAccountKey.json`.
+6.  **Deploy**. Copy the URL (e.g., `https://metaadieu-server.onrender.com`).
 
-**Important**: Your backend needs the Firebase Service Account Key. Since it is gitignored for security, you must manually upload it to the deployment service.
+### 2. Frontend Service (Static Site)
+Deploy the `client` directory.
 
-## Why not Vercel for Backend?
-Vercel functions are serverless and ephemeral. They shut down immediately after responding. Socket.IO requires a continuous connection, which Vercel kills instantly.
+1.  Create a new **Static Site** on Render.
+2.  Connect your GitHub repository.
+3.  **Root Directory**: Set to `client`.
+4.  **Build Command**: `npm run build`
+5.  **Publish Directory**: `dist`
+6.  **Environment Variables**:
+    *   `VITE_API_URL`: The URL of your backend (e.g., `https://metaadieu-server.onrender.com`).
+    *   `VITE_SOCKET_URL`: Same as above.
+    *   Add all your Firebase keys: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, etc.
+7.  **Deploy**.
+
+---
+
+## Option 2: Hybrid (Vercel + Render)
+
+*   **Frontend**: Deploy `client` folder to Vercel (Root Directory: `client`).
+*   **Backend**: Deploy `server` folder to Render (Root Directory: `server`).
+
+This is often faster/cheaper for the frontend, but splitting services is fine too.
