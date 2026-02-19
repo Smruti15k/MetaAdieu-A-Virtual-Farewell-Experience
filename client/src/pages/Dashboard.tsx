@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import styles from './Dashboard.module.css';
+import { auth } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface Event {
     id: string;
@@ -20,36 +22,59 @@ const Dashboard = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        const userData = localStorage.getItem('user');
-
-        if (!token) {
-            navigate('/login');
-            return;
-        }
-
-        if (userData) {
-            setUser(JSON.parse(userData));
-        }
-
-        const fetchEvents = async () => {
-            try {
-                const config = {
-                    headers: { Authorization: `Bearer ${token}` }
-                };
-                const res = await axios.get(`${API_base_URL}/api/events/my-events`, config);
-                if (res.data.success) {
-                    setEvents(res.data.events);
+        // Wait for Firebase auth to initialize before making API calls
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (!firebaseUser) {
+                // No Firebase user — check localStorage for legacy/guest sessions
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    navigate('/login');
+                    return;
                 }
-            } catch (err) {
-                console.error("Failed to fetch events", err);
-            } finally {
-                setLoading(false);
-            }
-        };
+                // Try with the stored token (may be stale)
+                const userData = localStorage.getItem('user');
+                if (userData) setUser(JSON.parse(userData));
+                await fetchEvents(token);
+            } else {
+                // Firebase user is signed in — get a fresh token
+                try {
+                    const freshToken = await firebaseUser.getIdToken(true);
+                    // Update localStorage with fresh token
+                    localStorage.setItem('token', freshToken);
 
-        fetchEvents();
+                    const userData = localStorage.getItem('user');
+                    if (userData) {
+                        setUser(JSON.parse(userData));
+                    } else {
+                        setUser({ name: firebaseUser.displayName || 'Host' });
+                    }
+
+                    await fetchEvents(freshToken);
+                } catch (err) {
+                    console.error("Failed to get fresh token:", err);
+                    navigate('/login');
+                }
+            }
+        });
+
+        return () => unsubscribe();
     }, [navigate]);
+
+    const fetchEvents = async (token: string) => {
+        try {
+            const config = {
+                headers: { Authorization: `Bearer ${token}` }
+            };
+            const res = await axios.get(`${API_base_URL}/api/events/my-events`, config);
+            if (res.data.success) {
+                setEvents(res.data.events);
+            }
+        } catch (err) {
+            console.error("Failed to fetch events", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const copyLink = (id: string) => {
         const link = `${window.location.origin}/event/${id}`;
@@ -67,6 +92,7 @@ const Dashboard = () => {
                     <Link to="/create-event" className={styles.createBtn}>+ Create New Event</Link>
                     <button onClick={() => {
                         localStorage.clear();
+                        auth.signOut();
                         navigate('/');
                     }} className={styles.logoutBtn}>Logout</button>
                 </div>
@@ -99,3 +125,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
