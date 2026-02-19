@@ -14,7 +14,7 @@ const configuration = {
     ],
 };
 
-const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
+const LiveStage = ({ eventId, socket, isHost }: LiveStageProps) => {
     const [streaming, setStreaming] = useState(false);
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
