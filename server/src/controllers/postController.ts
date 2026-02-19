@@ -3,11 +3,14 @@ import { db } from '../config/firebase';
 
 export const createPost = async (req: Request, res: Response): Promise<void> => {
     try {
-        let { eventId, type, content, caption } = req.body;
+        let { eventId, type, content, caption, guestName } = req.body;
+
+        // Support both authenticated users and guests
         // @ts-ignore
-        const userId = req.user.id;
-        // @ts-ignore
-        const userName = req.user.name;
+        const user = req.user;
+        const userId = user?.id || 'guest-' + Date.now();
+        const userName = user?.name || guestName || 'Guest';
+        const userPicture = user?.picture || null;
 
         // Start: File Upload Handling
         if (req.file) {
@@ -22,9 +25,6 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
                     return;
                 }
             } else if (req.file.mimetype.startsWith('video/')) {
-                // For videos, in a real app, you'd upload to Cloudinary/S3.
-                // Since ImgBB is images only, we can't upload video there.
-                // For this demo with Render (ephemeral fs), we'll warn or skip.
                 res.status(400).json({ error: 'Video upload requires external storage (S3/Cloudinary). ImgBB only supports images.' });
                 return;
             }
@@ -36,22 +36,39 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
             return;
         }
 
-        const newPost = {
+        const newPostData = {
             type,
             content,
-            caption,
+            caption: caption || '',
             authorId: userId,
             authorName: userName,
+            authorPicture: userPicture,
             createdAt: new Date().toISOString()
         };
 
-        const docRef = await db.collection('events').doc(eventId).collection('posts').add(newPost);
+        const docRef = await db.collection('events').doc(eventId).collection('posts').add(newPostData);
 
-        // Notify via socket?
+        // Build the response in the shape the frontend expects
+        const responsePost = {
+            id: docRef.id,
+            type: newPostData.type,
+            content: newPostData.content,
+            caption: newPostData.caption,
+            createdAt: newPostData.createdAt,
+            author: {
+                name: userName,
+                profilePicture: userPicture
+            }
+        };
+
+        // Notify via socket
         // @ts-ignore
-        req.io.to(eventId).emit('newPost', { id: docRef.id, ...newPost });
+        if (req.io) {
+            // @ts-ignore
+            req.io.to(eventId).emit('newPost', responsePost);
+        }
 
-        res.status(201).json({ success: true, post: { id: docRef.id, ...newPost } });
+        res.status(201).json({ success: true, post: responsePost });
     } catch (error: any) {
         console.error("Create Post Error:", error);
         res.status(500).json({ error: 'Failed to create post' });
@@ -62,7 +79,20 @@ export const getPosts = async (req: Request, res: Response): Promise<void> => {
     const eventId = req.params.eventId as string;
     try {
         const snapshot = await db.collection('events').doc(eventId).collection('posts').orderBy('createdAt', 'desc').get();
-        const posts = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        const posts = snapshot.docs.map(doc => {
+            const data = doc.data() as any;
+            return {
+                id: doc.id,
+                type: data.type,
+                content: data.content,
+                caption: data.caption || '',
+                createdAt: data.createdAt,
+                author: {
+                    name: data.authorName || 'Unknown',
+                    profilePicture: data.authorPicture || null
+                }
+            };
+        });
 
         res.json({ success: true, posts });
     } catch (error: any) {

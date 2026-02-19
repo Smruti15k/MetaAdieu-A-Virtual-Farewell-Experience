@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_base_URL } from '../config';
+import { auth } from '../firebase';
 import styles from './MemoryWall.module.css';
 
 interface Post {
@@ -63,11 +64,36 @@ const MemoryWall = ({ eventId, socket }: MemoryWallProps) => {
         }
     };
 
+    // Helper to get a fresh Firebase ID token
+    const getFreshToken = async (): Promise<string | null> => {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+            try {
+                // Force refresh to get a non-expired token
+                const token = await currentUser.getIdToken(true);
+                return token;
+            } catch (err) {
+                console.error("Failed to refresh Firebase token:", err);
+                return null;
+            }
+        }
+        // Fallback to localStorage (for guest sessions)
+        return localStorage.getItem('token');
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const token = localStorage.getItem('token');
-        if (!token) {
-            alert("Please login to post");
+
+        // Get token if available (authenticated user)
+        const token = await getFreshToken();
+
+        // Get user info from localStorage (works for both logged-in and guest users)
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const guestName = storedUser.name || 'Guest';
+
+        // Need either a token OR a guest name to post
+        if (!token && !storedUser.name) {
+            alert("Please login or join the event to post");
             return;
         }
 
@@ -76,6 +102,7 @@ const MemoryWall = ({ eventId, socket }: MemoryWallProps) => {
         formData.append('eventId', eventId);
         formData.append('type', postType);
         formData.append('caption', caption);
+        formData.append('guestName', guestName);
 
         if (postType === 'text') {
             formData.append('content', textContent);
@@ -84,11 +111,14 @@ const MemoryWall = ({ eventId, socket }: MemoryWallProps) => {
         }
 
         try {
-            const config = {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                }
+            const config: any = {
+                headers: {}
             };
+
+            // Only send auth header if we have a token
+            if (token) {
+                config.headers['Authorization'] = `Bearer ${token}`;
+            }
 
             const response = await axios.post(`${API_base_URL}/api/posts`, formData, config);
             if (response.data.success) {
@@ -104,9 +134,10 @@ const MemoryWall = ({ eventId, socket }: MemoryWallProps) => {
                 setFile(null);
                 setPostType('text'); // Reset to default
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Post failed", error);
-            alert("Failed to post memory");
+            const errorMsg = error.response?.data?.error || 'Failed to post memory';
+            alert(errorMsg);
         } finally {
             setIsPosting(false);
         }

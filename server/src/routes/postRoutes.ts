@@ -1,6 +1,6 @@
 import express from 'express';
 import { createPost, getPosts } from '../controllers/postController';
-import { protect } from '../middleware/authMiddleware';
+import { protect, optionalAuth } from '../middleware/authMiddleware';
 import multer from 'multer';
 
 // Use same multer config as upload routes or separate
@@ -13,8 +13,8 @@ const postUpload = multer({
 const router = express.Router();
 
 // Routes
-// POST /api/posts - Create new post (Protected, supports file upload)
-router.post('/', protect, postUpload, createPost);
+// POST /api/posts - Create new post (supports both authenticated users and guests)
+router.post('/', optionalAuth, postUpload, createPost);
 
 // GET /api/posts/event/:eventId - Get posts for an event (Public/Protected)
 router.get('/event/:eventId', getPosts);

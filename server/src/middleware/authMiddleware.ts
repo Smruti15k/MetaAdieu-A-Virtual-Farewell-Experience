@@ -31,3 +31,28 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
         res.status(401).json({ error: 'Not authorized, no token' });
     }
 };
+
+// Optional auth middleware: tries to authenticate, but allows guests through
+export const optionalAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            const token = req.headers.authorization.split(' ')[1];
+            if (token && token !== 'null' && token !== 'undefined') {
+                const decodedToken = await auth.verifyIdToken(token);
+                // @ts-ignore
+                req.user = {
+                    id: decodedToken.uid,
+                    email: decodedToken.email,
+                    name: decodedToken.name || decodedToken.email?.split('@')[0] || 'User',
+                    picture: decodedToken.picture
+                };
+            }
+        } catch (error) {
+            // Token failed verification — treat as guest
+            console.log('Optional auth: token verification failed, proceeding as guest');
+        }
+    }
+    // Always proceed — user may be a guest
+    next();
+};
+
