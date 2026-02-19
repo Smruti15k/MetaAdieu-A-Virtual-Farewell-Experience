@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import styles from './CreateEvent.module.css';
+import EventSuccessModal from '../components/EventSuccessModal';
 
 import { API_base_URL } from '../config';
 
@@ -14,6 +15,8 @@ const CreateEvent = () => {
     const [description, setDescription] = useState('');
     const [isPrivate, setIsPrivate] = useState(true);
     const [error, setError] = useState('');
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [createdEventId, setCreatedEventId] = useState('');
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -47,9 +50,8 @@ const CreateEvent = () => {
             const response = await axios.post(`${API_base_URL}/api/events`, payload, config);
 
             if (response.data.success) {
-                // Determine user intent or default direct
-                alert('Event Created Successfully! ID: ' + response.data.event.id);
-                navigate('/');
+                setCreatedEventId(response.data.event.id);
+                setShowSuccess(true);
             }
         } catch (err: any) {
             console.error(err);
@@ -58,8 +60,28 @@ const CreateEvent = () => {
         }
     };
 
+    const handleCreateAnother = () => {
+        setShowSuccess(false);
+        setCreatedEventId('');
+        setTitle('');
+        setGuestOfHonor('');
+        setEventDate('');
+        setDuration(60);
+        setDescription('');
+        setIsPrivate(true);
+        setError('');
+    };
+
     return (
         <div className={styles.container}>
+            {showSuccess && (
+                <EventSuccessModal
+                    eventId={createdEventId}
+                    eventTitle={title}
+                    onGoToDashboard={() => navigate('/')}
+                    onCreateAnother={handleCreateAnother}
+                />
+            )}
             <div className={styles.contentWrapper}>
                 {/* Left Side: Form */}
                 <div className={styles.formSection}>
