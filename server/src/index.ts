@@ -91,26 +91,39 @@ io.on('connection', (socket) => {
         io.to(eventId).emit('message', msg);
     });
 
-    // --- WebRTC Signaling ---
+    // --- WebRTC Signaling (Multi-party Video Call) ---
 
-    // User indicating they are ready to watch/stream
-    socket.on('joinLive', ({ eventId, isHost }) => {
-        // If host joins, notify everyone (or just track state)
-        // If guest joins, notify host so host can initiate connection (Mesh pattern)
-        socket.to(eventId).emit('userJoinedLive', { socketId: socket.id, isHost });
-        console.log(`User ${socket.id} joined live stage in ${eventId} (Host: ${isHost})`);
+    // Track which live rooms users are in for cleanup
+    let currentLiveRoom: string | null = null;
+
+    // User joins the live video call
+    socket.on('joinLive', ({ eventId, isHost, userName }) => {
+        currentLiveRoom = eventId;
+        // Notify all others in the room that a new user joined
+        socket.to(eventId).emit('userJoinedLive', { socketId: socket.id, isHost, userName });
+        console.log(`User ${userName} (${socket.id}) joined live stage in ${eventId}`);
     });
 
-    socket.on('offer', ({ target, sdp, caller }) => {
-        io.to(target).emit('offer', { sdp, caller });
+    // User leaves the live video call
+    socket.on('leaveLive', ({ eventId }) => {
+        currentLiveRoom = null;
+        socket.to(eventId).emit('userLeftLive', { socketId: socket.id });
+        console.log(`User ${socket.id} left live stage in ${eventId}`);
     });
 
-    socket.on('answer', ({ target, sdp, responder }) => {
-        io.to(target).emit('answer', { sdp, responder });
+    // WebRTC Offer (includes callerName for display)
+    socket.on('offer', ({ target, sdp, caller, callerName }) => {
+        io.to(target).emit('offer', { sdp, caller, callerName });
     });
 
+    // WebRTC Answer (includes responderName for display)
+    socket.on('answer', ({ target, sdp, responder, responderName }) => {
+        io.to(target).emit('answer', { sdp, responder, responderName });
+    });
+
+    // ICE Candidate (includes 'from' so receiver knows which peer it's for)
     socket.on('ice-candidate', ({ target, candidate }) => {
-        io.to(target).emit('ice-candidate', { candidate });
+        io.to(target).emit('ice-candidate', { candidate, from: socket.id });
     });
 
     socket.on('reaction', ({ eventId, emoji }) => {
@@ -119,7 +132,10 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
-        // Could notify room to remove peer connection
+        // If user was in a live room, notify others
+        if (currentLiveRoom) {
+            socket.to(currentLiveRoom).emit('userLeftLive', { socketId: socket.id });
+        }
     });
 });
 

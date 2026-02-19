@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 
 interface LiveStageProps {
@@ -8,91 +8,201 @@ interface LiveStageProps {
     userName: string;
 }
 
-const configuration = {
+interface RemotePeer {
+    socketId: string;
+    userName: string;
+    stream: MediaStream | null;
+    pc: RTCPeerConnection;
+}
+
+const configuration: RTCConfiguration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
     ],
 };
 
-const LiveStage = ({ eventId, socket, isHost }: LiveStageProps) => {
+const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
     const [streaming, setStreaming] = useState(false);
+    const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
+    const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
+
     const localVideoRef = useRef<HTMLVideoElement>(null);
-    const remoteVideoRef = useRef<HTMLVideoElement>(null);
-    const [status, setStatus] = useState('Waiting for host to start broadcast...');
-    const [reactions, setReactions] = useState<{ id: string, emoji: string, x: number }[]>([]);
-
-    // Store PeerConnections mapping socketId -> RTCPeerConnection
-    const peersRef = useRef<{ [key: string]: RTCPeerConnection }>({});
     const localStreamRef = useRef<MediaStream | null>(null);
+    const peersRef = useRef<Map<string, RemotePeer>>(new Map());
 
+    // Create a peer connection for a remote user
+    const createPeerConnection = useCallback(
+        (targetSocketId: string, targetUserName: string, localStream: MediaStream) => {
+            if (peersRef.current.has(targetSocketId)) return peersRef.current.get(targetSocketId)!;
+
+            const pc = new RTCPeerConnection(configuration);
+
+            // Add our local tracks to the connection
+            localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+            // When we receive remote tracks
+            pc.ontrack = (event) => {
+                const remoteStream = event.streams[0];
+                const existingPeer = peersRef.current.get(targetSocketId);
+                if (existingPeer) {
+                    existingPeer.stream = remoteStream;
+                    peersRef.current.set(targetSocketId, existingPeer);
+                }
+                // Force re-render
+                setRemotePeers(Array.from(peersRef.current.values()));
+            };
+
+            // ICE candidates
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket?.emit('ice-candidate', {
+                        target: targetSocketId,
+                        candidate: event.candidate,
+                    });
+                }
+            };
+
+            pc.oniceconnectionstatechange = () => {
+                if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+                    removePeer(targetSocketId);
+                }
+            };
+
+            const peer: RemotePeer = { socketId: targetSocketId, userName: targetUserName, stream: null, pc };
+            peersRef.current.set(targetSocketId, peer);
+            setRemotePeers(Array.from(peersRef.current.values()));
+
+            return peer;
+        },
+        [socket]
+    );
+
+    const removePeer = useCallback((socketId: string) => {
+        const peer = peersRef.current.get(socketId);
+        if (peer) {
+            peer.pc.close();
+            peersRef.current.delete(socketId);
+            setRemotePeers(Array.from(peersRef.current.values()));
+        }
+    }, []);
+
+    // Socket event handlers
     useEffect(() => {
         if (!socket) return;
 
-        console.log(`Joining Live Stage as ${isHost ? 'Host' : 'Guest'}`);
-        socket.emit('joinLive', { eventId, isHost });
+        // When a new user joins the live stage and we are already streaming
+        const handleUserJoined = async ({
+            socketId,
+            userName: joinerName,
+        }: {
+            socketId: string;
+            isHost: boolean;
+            userName: string;
+        }) => {
+            console.log(`User ${joinerName} (${socketId}) joined the live stage`);
+            if (!localStreamRef.current) return; // We're not streaming yet
 
-        const handleUserJoined = async ({ socketId, isHost: joinerIsHost }: { socketId: string, isHost: boolean }) => {
-            console.log(`User ${socketId} joined. Is Host: ${joinerIsHost}`);
-            if (isHost) {
-                if (localStreamRef.current) {
-                    console.log(`Initiating connection to ${socketId}`);
-                    createPeerConnection(socketId, localStreamRef.current);
-                }
-            } else {
-                if (joinerIsHost) {
-                    setStatus('Host joined the stage. Waiting for stream...');
+            // Create a peer connection and send an offer
+            const peer = createPeerConnection(socketId, joinerName, localStreamRef.current);
+            if (!peer) return;
+
+            try {
+                const offer = await peer.pc.createOffer();
+                await peer.pc.setLocalDescription(offer);
+                socket.emit('offer', {
+                    target: socketId,
+                    sdp: offer,
+                    caller: socket.id,
+                    callerName: userName,
+                });
+            } catch (err) {
+                console.error('Error creating offer:', err);
+            }
+        };
+
+        // Received an offer from another user
+        const handleOffer = async ({
+            sdp,
+            caller,
+            callerName,
+        }: {
+            sdp: RTCSessionDescriptionInit;
+            caller: string;
+            callerName: string;
+        }) => {
+            console.log('Received offer from', callerName);
+            if (!localStreamRef.current) return; // We need to be streaming to answer
+
+            const peer = createPeerConnection(caller, callerName, localStreamRef.current);
+            if (!peer) return;
+
+            try {
+                await peer.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                const answer = await peer.pc.createAnswer();
+                await peer.pc.setLocalDescription(answer);
+                socket.emit('answer', {
+                    target: caller,
+                    sdp: answer,
+                    responder: socket.id,
+                    responderName: userName,
+                });
+            } catch (err) {
+                console.error('Error handling offer:', err);
+            }
+        };
+
+        // Received an answer
+        const handleAnswer = async ({
+            sdp,
+            responder,
+            responderName,
+        }: {
+            sdp: RTCSessionDescriptionInit;
+            responder: string;
+            responderName: string;
+        }) => {
+            console.log('Received answer from', responderName);
+            const peer = peersRef.current.get(responder);
+            if (peer) {
+                try {
+                    await peer.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                } catch (err) {
+                    console.error('Error setting remote description:', err);
                 }
             }
         };
 
-        const handleOffer = async ({ sdp, caller }: { sdp: RTCSessionDescriptionInit, caller: string }) => {
-            if (isHost) return;
-
-            console.log('Received offer from', caller);
-            setStatus('Live transmission starting...');
-
-            const pc = new RTCPeerConnection(configuration);
-            peersRef.current[caller] = pc;
-
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('ice-candidate', { target: caller, candidate: event.candidate });
+        // ICE candidate
+        const handleCandidate = async ({
+            candidate,
+            from,
+        }: {
+            candidate: RTCIceCandidateInit;
+            from: string;
+        }) => {
+            const peer = peersRef.current.get(from);
+            if (peer) {
+                try {
+                    await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (e) {
+                    console.error('Error adding ICE candidate:', e);
                 }
-            };
-
-            pc.ontrack = (event) => {
-                console.log('Received track');
-                if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = event.streams[0];
-                }
-            };
-
-            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            socket.emit('answer', { target: caller, sdp: answer, responder: socket.id });
-        };
-
-        const handleAnswer = async ({ sdp, responder }: { sdp: RTCSessionDescriptionInit, responder: string }) => {
-            console.log('Received answer from', responder);
-            const pc = peersRef.current[responder];
-            if (pc) {
-                await pc.setRemoteDescription(new RTCSessionDescription(sdp));
             }
         };
 
-        const handleCandidate = async ({ candidate }: { candidate: RTCIceCandidateInit }) => {
-            Object.values(peersRef.current).forEach(pc => {
-                pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(e => console.error(e));
-            });
+        // User left
+        const handleUserLeft = ({ socketId }: { socketId: string }) => {
+            console.log('User left live stage:', socketId);
+            removePeer(socketId);
         };
 
-        const handleReaction = ({ emoji, id }: { emoji: string, id: string }) => {
+        // Reactions
+        const handleReaction = ({ emoji, id }: { emoji: string; id: string }) => {
             const x = Math.random() * 80 + 10;
-            setReactions(prev => [...prev, { id, emoji, x }]);
+            setReactions((prev) => [...prev, { id, emoji, x }]);
             setTimeout(() => {
-                setReactions(prev => prev.filter(r => r.id !== id));
+                setReactions((prev) => prev.filter((r) => r.id !== id));
             }, 2000);
         };
 
@@ -100,6 +210,7 @@ const LiveStage = ({ eventId, socket, isHost }: LiveStageProps) => {
         socket.on('offer', handleOffer);
         socket.on('answer', handleAnswer);
         socket.on('ice-candidate', handleCandidate);
+        socket.on('userLeftLive', handleUserLeft);
         socket.on('reaction', handleReaction);
 
         return () => {
@@ -107,11 +218,13 @@ const LiveStage = ({ eventId, socket, isHost }: LiveStageProps) => {
             socket.off('offer', handleOffer);
             socket.off('answer', handleAnswer);
             socket.off('ice-candidate', handleCandidate);
+            socket.off('userLeftLive', handleUserLeft);
             socket.off('reaction', handleReaction);
         };
-    }, [socket, isHost, eventId]);
+    }, [socket, userName, createPeerConnection, removePeer]);
 
-    const startBroadcast = async () => {
+    // Start camera and join live stage
+    const startCamera = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             localStreamRef.current = stream;
@@ -119,66 +232,71 @@ const LiveStage = ({ eventId, socket, isHost }: LiveStageProps) => {
                 localVideoRef.current.srcObject = stream;
             }
             setStreaming(true);
-            setStatus('Broadcasting live...');
+
+            // Tell the server we're joining the live stage
+            socket?.emit('joinLive', { eventId, isHost, userName });
         } catch (err) {
-            console.error("Failed to access camera", err);
-            setStatus('Checking camera permissions...');
-            alert("Could not access camera/microphone");
+            console.error('Failed to access camera', err);
+            alert('Could not access camera/microphone. Please check your browser permissions.');
         }
     };
 
-    const stopBroadcast = () => {
+    // Stop camera and leave
+    const stopCamera = () => {
         if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(t => t.stop());
+            localStreamRef.current.getTracks().forEach((t) => t.stop());
             localStreamRef.current = null;
         }
         if (localVideoRef.current) {
             localVideoRef.current.srcObject = null;
         }
+
+        // Close all peer connections
+        peersRef.current.forEach((peer) => peer.pc.close());
+        peersRef.current.clear();
+        setRemotePeers([]);
         setStreaming(false);
-        Object.values(peersRef.current).forEach(pc => pc.close());
-        peersRef.current = {};
-        setStatus('Broadcast stopped.');
-    };
 
-    const createPeerConnection = async (targetSocketId: string, stream: MediaStream) => {
-        if (peersRef.current[targetSocketId]) return;
-
-        const pc = new RTCPeerConnection(configuration);
-        peersRef.current[targetSocketId] = pc;
-
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket?.emit('ice-candidate', { target: targetSocketId, candidate: event.candidate });
-            }
-        };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket?.emit('offer', { target: targetSocketId, sdp: offer, caller: socket?.id });
+        socket?.emit('leaveLive', { eventId });
     };
 
     const sendReaction = (emoji: string) => {
         socket?.emit('reaction', { eventId, emoji });
     };
 
+    // Calculate grid layout
+    const totalParticipants = remotePeers.length + (streaming ? 1 : 0);
+    const gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : 3;
+
     return (
-        <div style={{ position: 'relative', padding: '2rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', overflow: 'hidden' }}>
-            <h2 style={{ marginBottom: '1rem', color: '#B3CFE5' }}>Live Broadcast Stage</h2>
+        <div
+            style={{
+                position: 'relative',
+                padding: '1.5rem',
+                textAlign: 'center',
+                background: 'rgba(0,0,0,0.2)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+            }}
+        >
+            <h2 style={{ marginBottom: '1rem', color: '#B3CFE5' }}>
+                Live Video Call {isHost && '(Host)'}
+            </h2>
 
             {/* Reactions Overlay */}
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
-                {reactions.map(r => (
-                    <div key={r.id} style={{
-                        position: 'absolute',
-                        left: `${r.x}%`,
-                        bottom: '0',
-                        fontSize: '2rem',
-                        animation: `floatUp 2s ease-out forwards`,
-                        opacity: 1
-                    }}>
+                {reactions.map((r) => (
+                    <div
+                        key={r.id}
+                        style={{
+                            position: 'absolute',
+                            left: `${r.x}%`,
+                            bottom: '0',
+                            fontSize: '2rem',
+                            animation: `floatUp 2s ease-out forwards`,
+                            opacity: 1,
+                        }}
+                    >
                         {r.emoji}
                     </div>
                 ))}
@@ -190,9 +308,28 @@ const LiveStage = ({ eventId, socket, isHost }: LiveStageProps) => {
                 `}</style>
             </div>
 
-            {isHost ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ position: 'relative', width: '100%', maxWidth: '700px', aspectRatio: '16/9', background: '#000', borderRadius: '8px', overflow: 'hidden' }}>
+            {/* Video Grid */}
+            {streaming ? (
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+                        gap: '10px',
+                        maxWidth: '900px',
+                        margin: '0 auto',
+                    }}
+                >
+                    {/* Local video (You) */}
+                    <div
+                        style={{
+                            position: 'relative',
+                            aspectRatio: '16/9',
+                            background: '#000',
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            border: '2px solid #4CAF50',
+                        }}
+                    >
                         <video
                             ref={localVideoRef}
                             autoPlay
@@ -200,73 +337,198 @@ const LiveStage = ({ eventId, socket, isHost }: LiveStageProps) => {
                             muted
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
-                        {!streaming && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>Camera Off</div>}
-                    </div>
-
-                    {/* Reactions Bar for Host too */}
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                        {['❤️', '👏', '😂', '😮', '😢', '🎉'].map(emoji => (
-                            <button type="button" key={emoji} onClick={() => sendReaction(emoji)} style={{ fontSize: '1.5rem', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'transform 0.1s' }}>{emoji}</button>
-                        ))}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                        {!streaming ? (
-                            <button
-                                onClick={startBroadcast}
-                                style={{
-                                    padding: '12px 24px',
-                                    fontSize: '1.1rem',
-                                    background: '#e74c3c',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '30px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 4px 15px rgba(231, 76, 60, 0.4)'
-                                }}>
-                                Start Broadcast 🎥
-                            </button>
-                        ) : (
-                            <button
-                                onClick={stopBroadcast}
-                                style={{
-                                    padding: '12px 24px',
-                                    fontSize: '1.1rem',
-                                    background: '#34495e',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '30px',
-                                    cursor: 'pointer'
-                                }}>
-                                Stop Broadcast ⏹️
-                            </button>
-                        )}
-                    </div>
-                    <p style={{ color: '#aaa', fontSize: '0.9rem' }}>You are the Host. Guests will see your camera feed.</p>
-                </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ position: 'relative', width: '100%', maxWidth: '800px', aspectRatio: '16/9', background: '#000', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }}>
-                        <video
-                            ref={remoteVideoRef}
-                            autoPlay
-                            playsInline
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(0,0,0,0.6)', padding: '5px 10px', borderRadius: '4px', color: 'white', fontSize: '0.8rem' }}>
-                            {status}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                bottom: '8px',
+                                left: '8px',
+                                background: 'rgba(0,0,0,0.7)',
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                color: '#4CAF50',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold',
+                            }}
+                        >
+                            You {isHost ? '(Host)' : ''}
                         </div>
                     </div>
 
-                    {/* Reactions Bar */}
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', background: 'rgba(255,255,255,0.1)', padding: '10px 20px', borderRadius: '50px' }}>
-                        {['❤️', '👏', '😂', '😮', '😢', '🎉'].map(emoji => (
-                            <button type="button" key={emoji} onClick={() => sendReaction(emoji)} style={{ fontSize: '2rem', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'transform 0.1s' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.8)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>{emoji}</button>
-                        ))}
+                    {/* Remote videos */}
+                    {remotePeers.map((peer) => (
+                        <RemoteVideo key={peer.socketId} peer={peer} />
+                    ))}
+                </div>
+            ) : (
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: '300px',
+                        gap: '1rem',
+                    }}
+                >
+                    <div
+                        style={{
+                            width: '120px',
+                            height: '120px',
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.05)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '3rem',
+                            border: '2px dashed rgba(255,255,255,0.2)',
+                        }}
+                    >
+                        🎥
                     </div>
-                    <p style={{ color: '#aaa' }}>Join the conversation in the chat!</p>
+                    <p style={{ color: '#aaa', fontSize: '1.1rem' }}>
+                        Join the video call to see and be seen by everyone!
+                    </p>
                 </div>
             )}
+
+            {/* Controls */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+                {!streaming ? (
+                    <button
+                        onClick={startCamera}
+                        style={{
+                            padding: '14px 28px',
+                            fontSize: '1.1rem',
+                            background: 'linear-gradient(135deg, #4CAF50, #45a049)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '30px',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
+                            fontWeight: 'bold',
+                        }}
+                    >
+                        Join Video Call 📹
+                    </button>
+                ) : (
+                    <button
+                        onClick={stopCamera}
+                        style={{
+                            padding: '14px 28px',
+                            fontSize: '1.1rem',
+                            background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '30px',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(231, 76, 60, 0.4)',
+                            fontWeight: 'bold',
+                        }}
+                    >
+                        Leave Call ✋
+                    </button>
+                )}
+            </div>
+
+            {/* Reactions Bar */}
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    marginTop: '1rem',
+                    background: 'rgba(255,255,255,0.08)',
+                    padding: '8px 16px',
+                    borderRadius: '50px',
+                    width: 'fit-content',
+                    margin: '1rem auto 0',
+                }}
+            >
+                {['❤️', '👏', '😂', '😮', '😢', '🎉'].map((emoji) => (
+                    <button
+                        type="button"
+                        key={emoji}
+                        onClick={() => sendReaction(emoji)}
+                        style={{
+                            fontSize: '1.5rem',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'transform 0.1s',
+                        }}
+                        onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.8)')}
+                        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                        {emoji}
+                    </button>
+                ))}
+            </div>
+
+            <p style={{ color: '#888', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+                {streaming
+                    ? `${totalParticipants} participant${totalParticipants !== 1 ? 's' : ''} in the call`
+                    : 'Click "Join Video Call" to share your camera with everyone'}
+            </p>
+        </div>
+    );
+};
+
+// Separate component to handle remote video refs
+const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (videoRef.current && peer.stream) {
+            videoRef.current.srcObject = peer.stream;
+        }
+    }, [peer.stream]);
+
+    return (
+        <div
+            style={{
+                position: 'relative',
+                aspectRatio: '16/9',
+                background: '#000',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                border: '2px solid rgba(179, 207, 229, 0.3)',
+            }}
+        >
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            {!peer.stream && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#666',
+                        fontSize: '0.9rem',
+                    }}
+                >
+                    Connecting...
+                </div>
+            )}
+            <div
+                style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    left: '8px',
+                    background: 'rgba(0,0,0,0.7)',
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    color: 'white',
+                    fontSize: '0.75rem',
+                }}
+            >
+                {peer.userName}
+            </div>
         </div>
     );
 };

@@ -132,7 +132,7 @@ const EventRoom = () => {
                 <button
                     className={`${styles.tab} ${activeTab === 'live' ? styles.active : ''}`}
                     onClick={() => setActiveTab('live')}>
-                    Live Stage (Coming Soon)
+                    Live Video Call 📹
                 </button>
                 <button className={styles.tab} onClick={handleDownloadKeepsake} style={{ marginLeft: 'auto', background: '#e0e0e0', color: '#333' }}>
                     Download Keepsake 📥
