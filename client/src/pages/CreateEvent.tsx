@@ -78,7 +78,7 @@ const CreateEvent = () => {
                 <EventSuccessModal
                     eventId={createdEventId}
                     eventTitle={title}
-                    onGoToDashboard={() => navigate('/')}
+                    onGoToDashboard={() => navigate('/dashboard')}
                     onCreateAnother={handleCreateAnother}
                 />
             )}
