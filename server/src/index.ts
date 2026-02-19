@@ -73,10 +73,27 @@ if (process.env.NODE_ENV === 'production') {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
+    // Track participants per room
+    const roomParticipants = new Map<string, Set<{ id: string, name: string }>>();
+
     // Join Event Room
-    socket.on('joinRoom', (eventId) => {
+    socket.on('joinRoom', ({ eventId, user }) => {
         socket.join(eventId);
-        console.log(`User ${socket.id} joined room ${eventId}`);
+
+        if (!roomParticipants.has(eventId)) {
+            roomParticipants.set(eventId, new Set());
+        }
+        const participants = roomParticipants.get(eventId)!;
+        // Remove existing if reconnecting
+        for (const p of participants) {
+            if (p.id === socket.id) participants.delete(p);
+        }
+        participants.add({ id: socket.id, name: user || 'Guest' });
+
+        console.log(`User ${user} (${socket.id}) joined room ${eventId}`);
+
+        // Broadcast updated list
+        io.to(eventId).emit('roomUsers', Array.from(participants));
     });
 
     // Chat Message
@@ -89,6 +106,30 @@ io.on('connection', (socket) => {
         };
         // Broadcast to room
         io.to(eventId).emit('message', msg);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+
+        // Remove from all rooms
+        roomParticipants.forEach((participants, eventId) => {
+            let found = false;
+            for (const p of participants) {
+                if (p.id === socket.id) {
+                    participants.delete(p);
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                io.to(eventId).emit('roomUsers', Array.from(participants));
+            }
+        });
+
+        // If user was in a live room, notify others
+        if (currentLiveRoom) {
+            socket.to(currentLiveRoom).emit('userLeftLive', { socketId: socket.id });
+        }
     });
 
     // --- WebRTC Signaling (Multi-party Video Call) ---

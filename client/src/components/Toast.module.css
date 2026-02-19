@@ -1,0 +1,108 @@
+.container {
+    position: fixed;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 300px;
+    max-width: 420px;
+    padding: 1rem 1.25rem;
+    border-radius: 14px;
+    background: rgba(16, 35, 65, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    color: #fff;
+    cursor: pointer;
+    animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(60px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+.icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.success .icon {
+    background: linear-gradient(135deg, #48bb78, #38a169);
+    color: #fff;
+}
+
+.error .icon {
+    background: linear-gradient(135deg, #f56565, #e53e3e);
+    color: #fff;
+}
+
+.info .icon {
+    background: linear-gradient(135deg, #63b3ed, #4299e1);
+    color: #fff;
+}
+
+.message {
+    flex: 1;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    font-weight: 500;
+}
+
+.progressBar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    border-radius: 0 0 14px 14px;
+    animation: progress 3.5s linear forwards;
+}
+
+.success .progressBar {
+    background: #48bb78;
+}
+
+.error .progressBar {
+    background: #f56565;
+}
+
+.info .progressBar {
+    background: #63b3ed;
+}
+
+@keyframes progress {
+    from {
+        width: 100%;
+    }
+
+    to {
+        width: 0%;
+    }
+}

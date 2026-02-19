@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaGoogle } from 'react-icons/fa';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import styles from './Auth.module.css';
-import { signInWithGoogle } from '../firebase';
+import { signInWithGoogle, auth } from '../firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { useToast } from '../components/Toast';
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetLoading, setResetLoading] = useState(false);
     const navigate = useNavigate();
+    const { showToast } = useToast();
 
     const handleGoogleSignIn = async () => {
         try {
@@ -23,7 +29,7 @@ const Login = () => {
                 email: user.email,
                 photo: user.photoURL
             }));
-            navigate('/');
+            navigate('/dashboard');
         } catch (err: any) {
             console.error(err);
             setError('Google Sign In failed. Please check your console.');
@@ -43,7 +49,7 @@ const Login = () => {
                 email: user.email,
                 photo: user.photoURL || 'https://via.placeholder.com/150'
             }));
-            navigate('/');
+            navigate('/dashboard');
         } catch (err: any) {
             console.error(err);
             setError(err.message || 'Login failed');
@@ -130,7 +136,14 @@ const Login = () => {
                                 />
                             </motion.div>
 
-                            <motion.a href="#" className={styles.forgotPassword} variants={itemVariants}>Forgot Password?</motion.a>
+                            <motion.span
+                                className={styles.forgotPassword}
+                                variants={itemVariants}
+                                onClick={() => setShowForgotPassword(true)}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                Forgot Password?
+                            </motion.span>
 
                             <motion.button
                                 type="submit"
@@ -163,6 +176,57 @@ const Login = () => {
                         </motion.div>
                     </motion.div>
                 </div>
+
+                {/* Forgot Password Modal */}
+                <AnimatePresence>
+                    {showForgotPassword && (
+                        <motion.div
+                            className={styles.modalOverlay}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowForgotPassword(false)}
+                        >
+                            <motion.div
+                                className={styles.modalCard}
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <h3 style={{ margin: '0 0 0.5rem', color: '#fff' }}>Reset Password</h3>
+                                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', margin: '0 0 1.5rem' }}>
+                                    Enter your email and we'll send you a reset link.
+                                </p>
+                                <form onSubmit={handleForgotPassword}>
+                                    <div className={styles.inputGroup}>
+                                        <input
+                                            type="email"
+                                            value={resetEmail}
+                                            onChange={e => setResetEmail(e.target.value)}
+                                            placeholder="Enter your email"
+                                            required
+                                        />
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        className={styles.submitBtn}
+                                        disabled={resetLoading}
+                                        style={{ marginTop: '0.5rem' }}
+                                    >
+                                        {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                                    </button>
+                                </form>
+                                <p
+                                    style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', marginTop: '1rem', cursor: 'pointer', textAlign: 'center' }}
+                                    onClick={() => setShowForgotPassword(false)}
+                                >
+                                    ← Back to Login
+                                </p>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );
