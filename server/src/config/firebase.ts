@@ -83,14 +83,14 @@ if (!admin.apps.length) {
         };
 
         if (serviceAccount) {
-            // FIX: Ensure the private key handles newlines correctly
-            // Sometimes \n gets double-escaped when copied into env vars or secret files
+            // FIX: Aggressively normalize the private key
             if (serviceAccount.private_key) {
-                serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+                serviceAccount.private_key = serviceAccount.private_key
+                    .replace(/\\n/g, '\n') // Fix escaped newlines
+                    .trim();               // Remove trailing spaces
             }
 
             config.credential = admin.credential.cert(serviceAccount);
-            // Explicitly set project ID
             config.projectId = serviceAccount.project_id;
 
             const maskedEmail = serviceAccount.client_email ?
