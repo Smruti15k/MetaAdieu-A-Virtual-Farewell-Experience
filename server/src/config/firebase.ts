@@ -72,6 +72,9 @@ try {
     console.error("Fatal error loading service account key:", error.message);
 }
 
+// Initialize Firebase Admin
+let app: admin.app.App;
+
 if (!admin.apps.length) {
     try {
         const config: admin.AppOptions = {
@@ -80,23 +83,29 @@ if (!admin.apps.length) {
 
         if (serviceAccount) {
             config.credential = admin.credential.cert(serviceAccount);
-            // Explicitly set project ID if found in service account to avoid mismatches
-            if (serviceAccount.project_id) {
-                config.projectId = serviceAccount.project_id;
-            }
+            // Explicitly set project ID
+            config.projectId = serviceAccount.project_id;
+
+            const maskedEmail = serviceAccount.client_email ?
+                `${serviceAccount.client_email.slice(0, 5)}...${serviceAccount.client_email.slice(-10)}` : 'unknown';
+
+            console.log(`🔑 Service Account Details: Project [${serviceAccount.project_id}], Email [${maskedEmail}]`);
         } else {
-            console.warn("Using applicationDefault() - this will likely fail on Render!");
+            console.warn("⚠️ No service account object. Using applicationDefault().");
             config.credential = admin.credential.applicationDefault();
         }
 
-        admin.initializeApp(config);
-        console.log("✅ Firebase Admin initialized" + (serviceAccount ? ` for project: ${serviceAccount.project_id}` : " (default)"));
+        app = admin.initializeApp(config);
+        console.log(`✅ Firebase Admin initialized for project: ${app.options.projectId || 'default'}`);
     } catch (e: any) {
         console.error("❌ Firebase Admin initialization failed:", e.message);
+        throw e;
     }
+} else {
+    app = admin.app();
 }
 
-export const db = admin.firestore();
-export const auth = admin.auth();
-export const storage = admin.storage();
+export const db = app.firestore();
+export const auth = app.auth();
+export const storage = app.storage();
 export { authMethodLogs };
