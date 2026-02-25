@@ -30,18 +30,19 @@ try {
 
     // Option 2: Path to JSON file in env var (Render secret files)
     if (!serviceAccount) {
-        const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
-        if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
+        const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH || '/etc/secrets/serviceAccountKey.json';
+        if (fs.existsSync(serviceAccountPath)) {
             try {
                 serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-                authMethodLogs.push(`Loaded from SERVICE_ACCOUNT_KEY_PATH: ${serviceAccountPath}`);
+                authMethodLogs.push(`Loaded from path: ${serviceAccountPath}`);
             } catch (e: any) {
-                console.error(`Failed to read SERVICE_ACCOUNT_KEY_PATH ${serviceAccountPath}:`, e.message);
+                console.error(`Failed to read path ${serviceAccountPath}:`, e.message);
+                authMethodLogs.push(`Error reading ${serviceAccountPath}: ${e.message}`);
             }
         }
     }
 
-    // Option 3 & 4: Local files (for development)
+    // Option 3: Local files (for development)
     if (!serviceAccount) {
         const searchPaths = [
             path.resolve(process.cwd(), 'serviceAccountKey.json'),
