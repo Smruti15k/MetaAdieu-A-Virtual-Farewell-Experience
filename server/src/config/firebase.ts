@@ -83,6 +83,12 @@ if (!admin.apps.length) {
         };
 
         if (serviceAccount) {
+            // FIX: Ensure the private key handles newlines correctly
+            // Sometimes \n gets double-escaped when copied into env vars or secret files
+            if (serviceAccount.private_key) {
+                serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+            }
+
             config.credential = admin.credential.cert(serviceAccount);
             // Explicitly set project ID
             config.projectId = serviceAccount.project_id;
