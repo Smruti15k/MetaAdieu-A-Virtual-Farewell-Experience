@@ -83,12 +83,23 @@ if (!admin.apps.length) {
         };
 
         if (serviceAccount) {
-            // FIX: Aggressively normalize the private key
+            // Aggressively normalize the private key
             if (serviceAccount.private_key) {
                 serviceAccount.private_key = serviceAccount.private_key
-                    .replace(/\\n/g, '\n') // Fix escaped newlines
-                    .trim();               // Remove trailing spaces
+                    .replace(/\\n/g, '\n')
+                    .replace(/\s+/g, (match: string) => {
+                        // Keep newlines but remove all other spaces/tabs inside the key block
+                        return match.includes('\n') ? '\n' : '';
+                    })
+                    .trim();
+
+                if (!serviceAccount.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
+                    console.error("❌ INVALID KEY FORMAT: Missing BEGIN header");
+                }
             }
+
+            // Force environment variables that the underlying gRPC libs often look for
+            process.env.GOOGLE_CLOUD_PROJECT = serviceAccount.project_id;
 
             config.credential = admin.credential.cert(serviceAccount);
             config.projectId = serviceAccount.project_id;
@@ -97,8 +108,9 @@ if (!admin.apps.length) {
                 `${serviceAccount.client_email.slice(0, 5)}...${serviceAccount.client_email.slice(-10)}` : 'unknown';
 
             console.log(`🔑 Service Account Details: Project [${serviceAccount.project_id}], Email [${maskedEmail}]`);
+            authMethodLogs.push(`Ready! Project: ${serviceAccount.project_id}, Email: ${maskedEmail}`);
         } else {
-            console.warn("⚠️ No service account object. Using applicationDefault().");
+            console.warn("⚠️ No service account object found.");
             config.credential = admin.credential.applicationDefault();
         }
 
@@ -115,4 +127,4 @@ if (!admin.apps.length) {
 export const db = app.firestore();
 export const auth = app.auth();
 export const storage = app.storage();
-export { authMethodLogs };
+export { authMethodLogs, serviceAccount };

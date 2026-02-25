@@ -11,7 +11,7 @@ router.post('/login', login);
 router.get('/profile', protect, getProfile);
 router.get('/debug-firebase', async (req, res) => {
     try {
-        const { authMethodLogs, db } = require('../config/firebase');
+        const { authMethodLogs, db, serviceAccount } = require('../config/firebase');
 
         // Live Test: Try to write to a test collection
         let firestoreTest = "Running...";
@@ -38,7 +38,8 @@ router.get('/debug-firebase', async (req, res) => {
             config: {
                 projectId: db.projectId,
                 initMethod: authMethodLogs[authMethodLogs.length - 1],
-                allLogs: authMethodLogs
+                keyFingerprint: serviceAccount?.private_key ?
+                    `${serviceAccount.private_key.substring(0, 30)}...${serviceAccount.private_key.slice(-30)}` : 'N/A'
             },
             envCheck: {
                 HAS_SA_VAR: !!process.env.FIREBASE_SERVICE_ACCOUNT,
