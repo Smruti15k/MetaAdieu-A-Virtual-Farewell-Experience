@@ -25,11 +25,15 @@ router.get('/debug-firebase', async (req, res) => {
         } catch (e: any) {
             firestoreTest = `❌ Write Failed: ${e.message}`;
             console.error("Firestore Debug Test Failed:", e);
+            // Attach full error details for debugging
+            // @ts-ignore
+            res._debugError = { name: e.name, code: e.code, details: e.details, stack: e.stack };
         }
 
         res.json({
             status: "Online",
             firestoreLiveTest: firestoreTest,
+            debugDetails: (res as any)._debugError || null,
             config: {
                 projectId: db.projectId,
                 initMethod: authMethodLogs[authMethodLogs.length - 1],

@@ -13,18 +13,19 @@ try {
     // Option 1: Base64-encoded JSON string in env var (best for Render/Vercel/Railway)
     let b64EnvVar = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (b64EnvVar) {
-        b64EnvVar = b64EnvVar.trim();
-        // Remove potential quotes if user accidentally added them
+        // Aggressively scrub all whitespace, newlines, and surrounding quotes
+        b64EnvVar = b64EnvVar.trim().replace(/\s/g, '');
         if (b64EnvVar.startsWith('"') && b64EnvVar.endsWith('"')) {
             b64EnvVar = b64EnvVar.slice(1, -1);
         }
+
         try {
             const decoded = Buffer.from(b64EnvVar, 'base64').toString('utf8');
             serviceAccount = JSON.parse(decoded);
-            authMethodLogs.push("Loaded from FIREBASE_SERVICE_ACCOUNT env var (base64)");
+            authMethodLogs.push("Loaded from FIREBASE_SERVICE_ACCOUNT (scrubbed base64)");
         } catch (e: any) {
             console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:", e.message);
-            authMethodLogs.push("Failed FIREBASE_SERVICE_ACCOUNT: " + e.message);
+            authMethodLogs.push("Failed FIREBASE_SERVICE_ACCOUNT parse: " + e.message);
         }
     }
 
