@@ -15,11 +15,17 @@ try {
     if (serviceAccountPath) {
         serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     } else {
-        // Try explicit local path in server root
+        // Try explicit local path in server root (JSON)
         const localPath = path.resolve(__dirname, '../../serviceAccountKey.json');
+        // Also try base64-encoded file
+        const b64Path = path.resolve(__dirname, '../../serviceAccountKey.b64');
         if (fs.existsSync(localPath)) {
             serviceAccount = JSON.parse(fs.readFileSync(localPath, 'utf8'));
             console.log("Loaded serviceAccountKey.json from local path");
+        } else if (fs.existsSync(b64Path)) {
+            const b64Content = fs.readFileSync(b64Path, 'utf8').trim();
+            serviceAccount = JSON.parse(Buffer.from(b64Content, 'base64').toString('utf8'));
+            console.log("Loaded serviceAccountKey from base64 file");
         } else {
             console.warn("No SERVICE_ACCOUNT_KEY_PATH provided and local file not found at " + localPath + ". Checking for default credentials...");
         }
