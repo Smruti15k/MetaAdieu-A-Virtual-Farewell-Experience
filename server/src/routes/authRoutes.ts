@@ -32,6 +32,7 @@ router.get('/debug-firebase', async (req, res) => {
 
         res.json({
             status: "Online",
+            serverTime: new Date().toISOString(),
             firestoreLiveTest: firestoreTest,
             debugDetails: (res as any)._debugError || null,
             config: {
