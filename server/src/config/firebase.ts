@@ -87,10 +87,6 @@ if (!admin.apps.length) {
             if (serviceAccount.private_key) {
                 serviceAccount.private_key = serviceAccount.private_key
                     .replace(/\\n/g, '\n')
-                    .replace(/\s+/g, (match: string) => {
-                        // Keep newlines but remove all other spaces/tabs inside the key block
-                        return match.includes('\n') ? '\n' : '';
-                    })
                     .trim();
 
                 if (!serviceAccount.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
