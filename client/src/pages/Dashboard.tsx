@@ -95,7 +95,6 @@ const Dashboard = () => {
     const handleDelete = async () => {
         if (!deleteId) return;
         try {
-            const token = localStorage.getItem('token');
             // Assuming DELETE endpoint exists or will exist soon
             // await axios.delete(`${API_base_URL}/api/events/${deleteId}`, { headers: { Authorization: `Bearer ${token}` } });
 

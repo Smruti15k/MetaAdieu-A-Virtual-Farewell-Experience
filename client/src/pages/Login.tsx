@@ -56,6 +56,26 @@ const Login = () => {
         }
     };
 
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!resetEmail) {
+            showToast('Please enter your email', 'error');
+            return;
+        }
+        setResetLoading(true);
+        try {
+            await sendPasswordResetEmail(auth, resetEmail);
+            showToast('Password reset email sent!', 'success');
+            setShowForgotPassword(false);
+            setResetEmail('');
+        } catch (err: any) {
+            console.error(err);
+            showToast('Failed to send reset email. Verify your email.', 'error');
+        } finally {
+            setResetLoading(false);
+        }
+    };
+
     const containerVariants: Variants = {
         hidden: { opacity: 0 },
         visible: {
