@@ -21,9 +21,10 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
             };
 
             return next();
-        } catch (error) {
-            console.error('Auth Middleware Error:', error);
-            res.status(401).json({ error: 'Not authorized, token failed' });
+        } catch (error: any) {
+            console.error('Auth Middleware Error: Token Verification Failed.');
+            console.error('Firebase Error Details:', error?.message || error);
+            res.status(401).json({ error: 'Not authorized, token failed', details: error?.message });
         }
     }
 
