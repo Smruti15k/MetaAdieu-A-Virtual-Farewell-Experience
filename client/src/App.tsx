@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import EventRoom from './pages/EventRoom';
 import JoinEvent from './pages/JoinEvent';
 import NotFound from './pages/NotFound';
+import { SupportBot } from './components/SupportBot';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/join-event" element={<JoinEvent />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <SupportBot />
       </Router>
     </ToastProvider>
   );
