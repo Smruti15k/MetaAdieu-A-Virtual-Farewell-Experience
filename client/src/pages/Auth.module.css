@@ -280,6 +280,36 @@
     font-size: 0.9rem;
 }
 
+.passwordWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.passwordWrapper input {
+    padding-right: 2.5rem;
+}
+
+.togglePassword {
+    position: absolute;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: #0A1931;
+    cursor: pointer;
+    font-size: 1.2rem;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.togglePassword:hover {
+    opacity: 1;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
     .container {

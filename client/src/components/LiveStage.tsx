@@ -260,6 +260,13 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
         socket?.emit('leaveLive', { eventId });
     };
 
+    // Attach stream to video element when it mounts
+    useEffect(() => {
+        if (streaming && localVideoRef.current && localStreamRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+        }
+    }, [streaming]);
+
     const sendReaction = (emoji: string) => {
         socket?.emit('reaction', { eventId, emoji });
     };
@@ -335,7 +342,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                             autoPlay
                             playsInline
                             muted
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
                         />
                         <div
                             style={{

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaGoogle } from 'react-icons/fa';
+import { FaGoogle, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import styles from './Auth.module.css';
@@ -11,6 +11,7 @@ import { useToast } from '../components/Toast';
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
@@ -147,13 +148,23 @@ const Login = () => {
                             </motion.div>
                             <motion.div className={styles.inputGroup} variants={itemVariants}>
                                 <label>Password</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter your password"
-                                    required
-                                />
+                                <div className={styles.passwordWrapper}>
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Enter your password"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className={styles.togglePassword}
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                    >
+                                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                                    </button>
+                                </div>
                             </motion.div>
 
                             <motion.span
