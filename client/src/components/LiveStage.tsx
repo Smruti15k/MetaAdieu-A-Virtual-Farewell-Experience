@@ -326,10 +326,10 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
         if (localStreamRef.current) {
             const audioTrack = localStreamRef.current.getAudioTracks()[0];
             if (audioTrack) {
-                const newMutedState = !audioTrack.enabled;
-                audioTrack.enabled = !newMutedState;
-                setIsMuted(newMutedState);
-                socket?.emit('peerStateChanged', { eventId, isVideoOff, isMuted: newMutedState });
+                const isCurrentlyEnabled = audioTrack.enabled;
+                audioTrack.enabled = !isCurrentlyEnabled;
+                setIsMuted(isCurrentlyEnabled);
+                socket?.emit('peerStateChanged', { eventId, isVideoOff, isMuted: isCurrentlyEnabled });
             }
         }
     };
@@ -338,10 +338,10 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
         if (localStreamRef.current) {
             const videoTrack = localStreamRef.current.getVideoTracks()[0];
             if (videoTrack) {
-                const newVideoOffState = !videoTrack.enabled;
-                videoTrack.enabled = !newVideoOffState;
-                setIsVideoOff(newVideoOffState);
-                socket?.emit('peerStateChanged', { eventId, isVideoOff: newVideoOffState, isMuted });
+                const isCurrentlyEnabled = videoTrack.enabled;
+                videoTrack.enabled = !isCurrentlyEnabled;
+                setIsVideoOff(isCurrentlyEnabled);
+                socket?.emit('peerStateChanged', { eventId, isVideoOff: isCurrentlyEnabled, isMuted });
             }
         }
     };
