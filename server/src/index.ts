@@ -182,6 +182,10 @@ io.on('connection', (socket) => {
         socket.to(eventId).emit('unmuteAll');
     });
 
+    socket.on('peerStateChanged', ({ eventId, isVideoOff, isMuted }) => {
+        socket.to(eventId).emit('peerStateChanged', { socketId: socket.id, isVideoOff, isMuted });
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         // If user was in a live room, notify others

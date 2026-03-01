@@ -26,6 +26,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
     const [streaming, setStreaming] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
+    const [peerStates, setPeerStates] = useState<Record<string, { isVideoOff: boolean; isMuted: boolean }>>({});
     const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
     const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
 
@@ -199,6 +200,11 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
         const handleUserLeft = ({ socketId }: { socketId: string }) => {
             console.log('User left live stage:', socketId);
             removePeer(socketId);
+            setPeerStates((prev) => {
+                const newStates = { ...prev };
+                delete newStates[socketId];
+                return newStates;
+            });
         };
 
         // Reactions
@@ -216,6 +222,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
             if (localStreamRef.current) {
                 localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = false));
             }
+            socket.emit('peerStateChanged', { eventId, isVideoOff, isMuted: true });
         };
 
         const handleUnmuteAll = () => {
@@ -223,6 +230,14 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
             if (localStreamRef.current) {
                 localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = true));
             }
+            socket.emit('peerStateChanged', { eventId, isVideoOff, isMuted: false });
+        };
+
+        const handlePeerStateChanged = ({ socketId, isVideoOff, isMuted }: { socketId: string, isVideoOff: boolean, isMuted: boolean }) => {
+            setPeerStates((prev) => ({
+                ...prev,
+                [socketId]: { isVideoOff, isMuted }
+            }));
         };
 
         socket.on('userJoinedLive', handleUserJoined);
@@ -233,6 +248,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
         socket.on('reaction', handleReaction);
         socket.on('muteAll', handleMuteAll);
         socket.on('unmuteAll', handleUnmuteAll);
+        socket.on('peerStateChanged', handlePeerStateChanged);
 
         return () => {
             socket.off('userJoinedLive', handleUserJoined);
@@ -243,6 +259,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
             socket.off('reaction', handleReaction);
             socket.off('muteAll', handleMuteAll);
             socket.off('unmuteAll', handleUnmuteAll);
+            socket.off('peerStateChanged', handlePeerStateChanged);
         };
     }, [socket, userName, createPeerConnection, removePeer]);
 
@@ -260,6 +277,11 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
 
             // Tell the server we're joining the live stage
             socket?.emit('joinLive', { eventId, isHost, userName });
+
+            // Broadcast initial state after a short delay to ensure others have established connection
+            setTimeout(() => {
+                socket?.emit('peerStateChanged', { eventId, isVideoOff: false, isMuted: false });
+            }, 1000);
         } catch (err) {
             console.error('Failed to access camera', err);
             alert('Could not access camera/microphone. Please check your browser permissions.');
@@ -304,8 +326,10 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
         if (localStreamRef.current) {
             const audioTrack = localStreamRef.current.getAudioTracks()[0];
             if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled;
-                setIsMuted(!audioTrack.enabled);
+                const newMutedState = !audioTrack.enabled;
+                audioTrack.enabled = !newMutedState;
+                setIsMuted(newMutedState);
+                socket?.emit('peerStateChanged', { eventId, isVideoOff, isMuted: newMutedState });
             }
         }
     };
@@ -314,8 +338,10 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
         if (localStreamRef.current) {
             const videoTrack = localStreamRef.current.getVideoTracks()[0];
             if (videoTrack) {
-                videoTrack.enabled = !videoTrack.enabled;
-                setIsVideoOff(!videoTrack.enabled);
+                const newVideoOffState = !videoTrack.enabled;
+                videoTrack.enabled = !newVideoOffState;
+                setIsVideoOff(newVideoOffState);
+                socket?.emit('peerStateChanged', { eventId, isVideoOff: newVideoOffState, isMuted });
             }
         }
     };
@@ -393,16 +419,14 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                         margin: '0 auto',
                     }}
                 >
-                    {/* Local video (You) */}
                     <div
                         ref={localVideoContainerRef}
                         style={{
                             position: 'relative',
                             aspectRatio: '16/9',
-                            background: '#000',
-                            borderRadius: '10px',
+                            background: '#3c4043',
+                            borderRadius: '12px',
                             overflow: 'hidden',
-                            border: '2px solid #4CAF50',
                         }}
                         onDoubleClick={() => toggleFullScreen(localVideoContainerRef)}
                     >
@@ -411,50 +435,81 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                             autoPlay
                             playsInline
                             muted
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                transform: 'scaleX(-1)',
+                                display: isVideoOff ? 'none' : 'block'
+                            }}
                         />
+                        {isVideoOff && (
+                            <div style={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}>
+                                <div style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    borderRadius: '50%',
+                                    background: '#5f6368',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '2rem',
+                                    color: 'white',
+                                    fontWeight: 'bold'
+                                }}>
+                                    {userName.charAt(0).toUpperCase()}
+                                </div>
+                            </div>
+                        )}
                         <div
                             style={{
                                 position: 'absolute',
-                                bottom: '8px',
-                                left: '8px',
-                                background: 'rgba(0,0,0,0.7)',
-                                padding: '4px 10px',
-                                borderRadius: '4px',
-                                color: '#4CAF50',
-                                fontSize: '0.75rem',
-                                fontWeight: 'bold',
+                                bottom: '12px',
+                                left: '12px',
+                                color: 'white',
+                                fontSize: '0.9rem',
+                                fontWeight: '500',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '5px'
+                                gap: '8px'
                             }}
                         >
                             You {isHost ? '(Host)' : ''}
-                            {isMuted && <span style={{ color: '#e74c3c' }}>🔇</span>}
-                            {isVideoOff && <span style={{ color: '#e74c3c' }}>🚫</span>}
                         </div>
-                        <button
-                            onClick={() => toggleFullScreen(localVideoContainerRef)}
-                            style={{
+                        {isMuted && (
+                            <div style={{
                                 position: 'absolute',
-                                top: '8px',
-                                right: '8px',
+                                top: '12px',
+                                right: '12px',
                                 background: 'rgba(0,0,0,0.5)',
                                 color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                padding: '4px 8px',
-                                cursor: 'pointer',
-                                fontSize: '1rem',
-                            }}
-                        >
-                            🔲
-                        </button>
+                                borderRadius: '50%',
+                                width: '30px',
+                                height: '30px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.9rem'
+                            }}>
+                                🔇
+                            </div>
+                        )}
                     </div>
 
                     {/* Remote videos */}
                     {remotePeers.map((peer) => (
-                        <RemoteVideo key={peer.socketId} peer={peer} />
+                        <RemoteVideo
+                            key={peer.socketId}
+                            peer={peer}
+                            peerState={peerStates[peer.socketId]}
+                        />
                     ))}
                 </div>
             ) : (
@@ -638,9 +693,12 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
 };
 
 // Separate component to handle remote video refs
-const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
+const RemoteVideo = ({ peer, peerState }: { peer: RemotePeer, peerState?: { isVideoOff: boolean; isMuted: boolean } }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const isVideoOff = peerState?.isVideoOff ?? false;
+    const isMuted = peerState?.isMuted ?? false;
 
     useEffect(() => {
         if (videoRef.current && peer.stream) {
@@ -664,10 +722,9 @@ const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
             style={{
                 position: 'relative',
                 aspectRatio: '16/9',
-                background: '#000',
-                borderRadius: '10px',
+                background: '#3c4043',
+                borderRadius: '12px',
                 overflow: 'hidden',
-                border: '2px solid rgba(179, 207, 229, 0.3)',
             }}
             onDoubleClick={toggleFullScreen}
         >
@@ -675,54 +732,68 @@ const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
                 ref={videoRef}
                 autoPlay
                 playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: isVideoOff ? 'none' : 'block'
+                }}
             />
-            {!peer.stream && (
-                <div
-                    style={{
-                        position: 'absolute',
-                        inset: 0,
+            {(!peer.stream || isVideoOff) && (
+                <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <div style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        background: '#5f6368', // Material grayish color for avatars
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#666',
-                        fontSize: '0.9rem',
-                    }}
-                >
-                    Connecting...
+                        fontSize: '2rem',
+                        color: 'white',
+                        fontWeight: 'bold'
+                    }}>
+                        {peer.userName.charAt(0).toUpperCase()}
+                    </div>
                 </div>
             )}
             <div
                 style={{
                     position: 'absolute',
-                    bottom: '8px',
-                    left: '8px',
-                    background: 'rgba(0,0,0,0.7)',
-                    padding: '4px 10px',
-                    borderRadius: '4px',
+                    bottom: '12px',
+                    left: '12px',
                     color: 'white',
-                    fontSize: '0.75rem',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.6)'
                 }}
             >
                 {peer.userName}
             </div>
-            <button
-                onClick={toggleFullScreen}
-                style={{
+            {isMuted && (
+                <div style={{
                     position: 'absolute',
-                    top: '8px',
-                    right: '8px',
+                    top: '12px',
+                    right: '12px',
                     background: 'rgba(0,0,0,0.5)',
                     color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    padding: '4px 8px',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                }}
-            >
-                🔲
-            </button>
+                    borderRadius: '50%',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.9rem'
+                }}>
+                    🔇
+                </div>
+            )}
         </div>
     );
 };
