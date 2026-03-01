@@ -28,7 +28,7 @@ const Register = () => {
             navigate('/');
         } catch (err: any) {
             console.error(err);
-            setError('Google Sign Up failed. Please check your console.');
+            setError(err.message || 'Google Sign Up failed. Please check your console.');
         }
     };
 

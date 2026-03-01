@@ -33,7 +33,7 @@ const Login = () => {
             navigate('/dashboard');
         } catch (err: any) {
             console.error(err);
-            setError('Google Sign In failed. Please check your console.');
+            setError(err.message || 'Google Sign In failed. Please check your console.');
         }
     };
 
