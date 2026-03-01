@@ -415,7 +415,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                         display: 'grid',
                         gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
                         gap: '10px',
-                        maxWidth: '900px',
+                        width: '100%',
                         margin: '0 auto',
                     }}
                 >
@@ -438,7 +438,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                             style={{
                                 width: '100%',
                                 height: '100%',
-                                objectFit: 'contain',
+                                objectFit: 'cover',
                                 transform: 'scaleX(-1)',
                                 display: isVideoOff ? 'none' : 'block'
                             }}
@@ -735,7 +735,7 @@ const RemoteVideo = ({ peer, peerState }: { peer: RemotePeer, peerState?: { isVi
                 style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'contain',
+                    objectFit: 'cover',
                     display: isVideoOff ? 'none' : 'block'
                 }}
             />
