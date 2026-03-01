@@ -174,6 +174,14 @@ io.on('connection', (socket) => {
         io.to(eventId).emit('reaction', { emoji, id: Date.now() + Math.random() });
     });
 
+    socket.on('muteAll', ({ eventId }) => {
+        socket.to(eventId).emit('muteAll');
+    });
+
+    socket.on('unmuteAll', ({ eventId }) => {
+        socket.to(eventId).emit('unmuteAll');
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         // If user was in a live room, notify others

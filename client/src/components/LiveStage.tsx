@@ -24,8 +24,12 @@ const configuration: RTCConfiguration = {
 
 const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
     const [streaming, setStreaming] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
     const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
     const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
+
+    const localVideoContainerRef = useRef<HTMLDivElement>(null);
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
@@ -206,12 +210,29 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
             }, 2000);
         };
 
+        // Mute/Unmute All
+        const handleMuteAll = () => {
+            setIsMuted(true);
+            if (localStreamRef.current) {
+                localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = false));
+            }
+        };
+
+        const handleUnmuteAll = () => {
+            setIsMuted(false);
+            if (localStreamRef.current) {
+                localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = true));
+            }
+        };
+
         socket.on('userJoinedLive', handleUserJoined);
         socket.on('offer', handleOffer);
         socket.on('answer', handleAnswer);
         socket.on('ice-candidate', handleCandidate);
         socket.on('userLeftLive', handleUserLeft);
         socket.on('reaction', handleReaction);
+        socket.on('muteAll', handleMuteAll);
+        socket.on('unmuteAll', handleUnmuteAll);
 
         return () => {
             socket.off('userJoinedLive', handleUserJoined);
@@ -220,6 +241,8 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
             socket.off('ice-candidate', handleCandidate);
             socket.off('userLeftLive', handleUserLeft);
             socket.off('reaction', handleReaction);
+            socket.off('muteAll', handleMuteAll);
+            socket.off('unmuteAll', handleUnmuteAll);
         };
     }, [socket, userName, createPeerConnection, removePeer]);
 
@@ -232,6 +255,8 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                 localVideoRef.current.srcObject = stream;
             }
             setStreaming(true);
+            setIsMuted(false);
+            setIsVideoOff(false);
 
             // Tell the server we're joining the live stage
             socket?.emit('joinLive', { eventId, isHost, userName });
@@ -274,6 +299,48 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
     // Calculate grid layout
     const totalParticipants = remotePeers.length + (streaming ? 1 : 0);
     const gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : 3;
+
+    const toggleMute = () => {
+        if (localStreamRef.current) {
+            const audioTrack = localStreamRef.current.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                setIsMuted(!audioTrack.enabled);
+            }
+        }
+    };
+
+    const toggleVideo = () => {
+        if (localStreamRef.current) {
+            const videoTrack = localStreamRef.current.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                setIsVideoOff(!videoTrack.enabled);
+            }
+        }
+    };
+
+    const muteAllParticipants = () => {
+        if (isHost) {
+            socket?.emit('muteAll', { eventId });
+        }
+    };
+
+    const unmuteAllParticipants = () => {
+        if (isHost) {
+            socket?.emit('unmuteAll', { eventId });
+        }
+    };
+
+    const toggleFullScreen = (elementRef: React.RefObject<HTMLDivElement | null>) => {
+        if (!document.fullscreenElement) {
+            elementRef.current?.requestFullscreen().catch((err) => {
+                console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
 
     return (
         <div
@@ -328,6 +395,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                 >
                     {/* Local video (You) */}
                     <div
+                        ref={localVideoContainerRef}
                         style={{
                             position: 'relative',
                             aspectRatio: '16/9',
@@ -336,6 +404,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                             overflow: 'hidden',
                             border: '2px solid #4CAF50',
                         }}
+                        onDoubleClick={() => toggleFullScreen(localVideoContainerRef)}
                     >
                         <video
                             ref={localVideoRef}
@@ -355,10 +424,32 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                                 color: '#4CAF50',
                                 fontSize: '0.75rem',
                                 fontWeight: 'bold',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px'
                             }}
                         >
                             You {isHost ? '(Host)' : ''}
+                            {isMuted && <span style={{ color: '#e74c3c' }}>🔇</span>}
+                            {isVideoOff && <span style={{ color: '#e74c3c' }}>🚫</span>}
                         </div>
+                        <button
+                            onClick={() => toggleFullScreen(localVideoContainerRef)}
+                            style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                background: 'rgba(0,0,0,0.5)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                fontSize: '1rem',
+                            }}
+                        >
+                            🔲
+                        </button>
                     </div>
 
                     {/* Remote videos */}
@@ -418,22 +509,88 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
                         Join Video Call 📹
                     </button>
                 ) : (
-                    <button
-                        onClick={stopCamera}
-                        style={{
-                            padding: '14px 28px',
-                            fontSize: '1.1rem',
-                            background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '30px',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 15px rgba(231, 76, 60, 0.4)',
-                            fontWeight: 'bold',
-                        }}
-                    >
-                        Leave Call ✋
-                    </button>
+                    <>
+                        {isHost && (
+                            <>
+                                <button
+                                    onClick={muteAllParticipants}
+                                    style={{
+                                        padding: '10px 20px',
+                                        fontSize: '1rem',
+                                        background: '#f39c12',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '30px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                    }}
+                                >
+                                    Mute All
+                                </button>
+                                <button
+                                    onClick={unmuteAllParticipants}
+                                    style={{
+                                        padding: '10px 20px',
+                                        fontSize: '1rem',
+                                        background: '#2ecc71',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '30px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                    }}
+                                >
+                                    Unmute All
+                                </button>
+                            </>
+                        )}
+                        <button
+                            onClick={toggleMute}
+                            style={{
+                                padding: '10px 20px',
+                                fontSize: '1rem',
+                                background: isMuted ? '#e74c3c' : '#34495e',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '30px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                            }}
+                        >
+                            {isMuted ? 'Unmute 🎤' : 'Mute 🔇'}
+                        </button>
+                        <button
+                            onClick={toggleVideo}
+                            style={{
+                                padding: '10px 20px',
+                                fontSize: '1rem',
+                                background: isVideoOff ? '#e74c3c' : '#34495e',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '30px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                            }}
+                        >
+                            {isVideoOff ? 'Start Video 📷' : 'Stop Video 🚫'}
+                        </button>
+                        <button
+                            onClick={stopCamera}
+                            style={{
+                                padding: '10px 20px',
+                                fontSize: '1rem',
+                                background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '30px',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 15px rgba(231, 76, 60, 0.4)',
+                                fontWeight: 'bold',
+                            }}
+                        >
+                            Leave Call ✋
+                        </button>
+                    </>
                 )}
             </div>
 
@@ -483,6 +640,7 @@ const LiveStage = ({ eventId, socket, isHost, userName }: LiveStageProps) => {
 // Separate component to handle remote video refs
 const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (videoRef.current && peer.stream) {
@@ -490,8 +648,19 @@ const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
         }
     }, [peer.stream]);
 
+    const toggleFullScreen = () => {
+        if (!document.fullscreenElement) {
+            containerRef.current?.requestFullscreen().catch((err) => {
+                console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
     return (
         <div
+            ref={containerRef}
             style={{
                 position: 'relative',
                 aspectRatio: '16/9',
@@ -500,6 +669,7 @@ const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
                 overflow: 'hidden',
                 border: '2px solid rgba(179, 207, 229, 0.3)',
             }}
+            onDoubleClick={toggleFullScreen}
         >
             <video
                 ref={videoRef}
@@ -536,6 +706,23 @@ const RemoteVideo = ({ peer }: { peer: RemotePeer }) => {
             >
                 {peer.userName}
             </div>
+            <button
+                onClick={toggleFullScreen}
+                style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    background: 'rgba(0,0,0,0.5)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                }}
+            >
+                🔲
+            </button>
         </div>
     );
 };
