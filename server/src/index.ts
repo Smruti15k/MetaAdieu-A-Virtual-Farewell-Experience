@@ -48,7 +48,10 @@ app.use('/api/posts', postRoutes);
 app.use('/api/guestbook', guestbookRoutes);
 
 import keepsakeRoutes from './routes/keepsakeRoutes';
+import supportRoutes from './routes/supportRoutes';
+
 app.use('/api/keepsake', keepsakeRoutes);
+app.use('/api/support', supportRoutes);
 
 
 import path from 'path';

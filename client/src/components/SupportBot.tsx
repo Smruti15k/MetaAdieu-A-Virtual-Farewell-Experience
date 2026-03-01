@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import styles from './SupportBot.module.css';
+import { API_base_URL } from '../config';
 
 interface Message {
     role: 'user' | 'assistant' | 'system';
@@ -14,7 +15,6 @@ export const SupportBot = () => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY || '';
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,20 +42,21 @@ export const SupportBot = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            const response = await fetch(`${API_base_URL}/api/support/chat`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'llama-3.3-70b-versatile',
-                    messages: [
-                        { role: 'system', content: 'You are a friendly, helpful support bot for MetaAdieu, a platform for hosting virtual farewell events. Keep your answers concise, empathetic, and directly helpful.' },
-                        ...newMessages.map(m => ({ role: m.role, content: m.content }))
-                    ]
+                    messages: newMessages.map(m => ({ role: m.role, content: m.content }))
                 })
             });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Bot Server API Error:', response.status, errorData);
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
 
@@ -65,7 +66,8 @@ export const SupportBot = () => {
                     content: data.choices[0].message.content
                 }]);
             } else {
-                throw new Error('Invalid response from Groq');
+                console.error('Unexpected bot response format:', data);
+                throw new Error('Invalid response from bot server');
             }
         } catch (error) {
             console.error('Error sending message:', error);
